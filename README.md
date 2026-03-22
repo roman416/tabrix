@@ -1,83 +1,326 @@
-# Табрикс
+# Tabrix
 
-Прототип табличного веб-приложения на Flask для загрузки и анализа CSV, TSV, XLSX, XLSM, XLS и Parquet.
+**Fast, AI-assisted spreadsheet for large datasets**
+**Быстрая таблица с ИИ для работы с большими данными**
 
-## Что уже работает
+---
 
-- импорт таблиц
-- просмотр и ручное редактирование ячеек
-- добавление и удаление строк
-- фильтр по таблице и пагинация предпросмотра
-- статистика по колонкам
-- построение сводной таблицы
-- сортировка по возрастанию и убыванию с кэшем в SQLite
-- автодашборды по данным
-- локальный помощник через Ollama с fallback-ответом на Python
+# 🇷🇺 Русская версия
 
-## Как теперь устроена сортировка
+## О проекте
 
-Сортировка больше не использует C, EXE и временные отсортированные CSV.
+**Tabrix** — это веб-приложение для работы с таблицами больших объёмов данных.
+Проект создаётся как лёгкая и быстрая альтернатива Excel с поддержкой:
 
-Теперь логика такая:
+* больших таблиц
+* серверной сортировки
+* аналитики по диапазонам
+* работы через LLM (ИИ)
+* доступа к данным по координатам
+* статистики по колонкам
+* поиска строк по значению ячейки
 
-- исходная таблица остаётся основной
-- при первом запросе сортировки сервер считает порядок строк на Python
-- этот порядок сохраняется в базе `tabrix.db` в таблице `sort_cache`
-- при повторной сортировке по той же колонке и направлению порядок берётся из базы без пересчёта
-- если таблица изменилась, кэш сортировки для неё сбрасывается автоматически
+Tabrix ориентирован на скорость, простоту и работу с big data без перегруженного интерфейса.
 
-Это избавляет проект от лишних бинарников, мусорных файлов и повторных вычислений. Наконец-то хоть что-то в мире работает без культовых плясок вокруг `.exe`.
+---
 
-## Запуск
+## Возможности
 
-### Linux / macOS
+### Таблицы
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+* Загрузка CSV / Excel
+* Просмотр постранично (100 строк)
+* Переход к конкретной ячейке
+* Ручное редактирование
+* Удаление таблиц
+* Большие файлы без зависаний
+
+### Сортировка (кэшируется)
+
+* Сортировка по возрастанию / убыванию
+* Считается один раз
+* Результат сохраняется в БД
+* Повторные запросы мгновенные
+
+### Аналитика
+
+* Сумма
+* Среднее
+* Медиана
+* Минимум / максимум
+* Количество уникальных значений
+* Дисперсия
+* Стандартное отклонение
+
+### LLM / ИИ
+
+ИИ может:
+
+* получить значение ячейки по координате
+* найти строку по значению ячейки
+* анализировать диапазон
+* выполнять фильтрацию
+* считать статистику
+* отвечать на вопросы по таблице
+
+Пример:
+
+> найди все строки где A > 100
+> покажи среднее по колонке C
+> найди строку где id = 42
+
+---
+
+## Архитектура
+
+```
+Frontend (HTML + JS)
+        │
+        ▼
+Flask backend (Python)
+        │
+        ├── SQLite (таблицы + кэш сортировки)
+        │
+        └── LLM (Ollama / DeepSeek)
+```
+
+---
+
+## Установка
+
+### 1. Клонирование
+
+```
+git clone https://github.com/yourrepo/tabrix
+cd tabrix
+```
+
+### 2. Установка зависимостей
+
+```
+pip install flask pandas openpyxl requests
+```
+
+### 3. Запуск
+
+```
 python app.py
 ```
 
-### Windows
+Открыть:
 
-```bat
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+```
+http://localhost:5000
+```
+
+---
+
+## Поддержка LLM (Ollama)
+
+Установить Ollama:
+
+https://ollama.ai
+
+Скачать модель:
+
+```
+ollama pull deepseek-r1:8b
+```
+
+Запустить:
+
+```
+ollama run deepseek-r1:8b
+```
+
+После этого ИИ автоматически подключится к Tabrix.
+
+---
+
+## База данных
+
+Используется SQLite:
+
+```
+tabrix.db
+```
+
+Хранит:
+
+* таблицы
+* метаданные
+* кэш сортировок
+* статистику
+
+---
+
+## Почему Tabrix
+
+* быстрее Excel на больших данных
+* открытый код
+* встроенный ИИ
+* серверная обработка
+* минималистичный интерфейс
+* нет проприетарных ограничений
+
+---
+
+# 🇬🇧 English Version
+
+## About
+
+**Tabrix** is a fast web-based spreadsheet designed for large datasets.
+It is built as a lightweight alternative to Excel with AI integration.
+
+Tabrix focuses on:
+
+* speed
+* large data support
+* server-side processing
+* AI analytics
+* clean UI
+
+---
+
+## Features
+
+### Tables
+
+* CSV / Excel upload
+* Pagination (100 rows)
+* Jump to cell
+* Manual editing
+* Delete tables
+* Large dataset support
+
+### Cached Sorting
+
+* Ascending / descending
+* Calculated once
+* Stored in database
+* Instant reuse
+
+### Analytics
+
+* Sum
+* Average
+* Median
+* Min / Max
+* Unique values
+* Variance
+* Standard deviation
+
+### AI Assistant
+
+The LLM can:
+
+* read cell by coordinates
+* find row by value
+* filter ranges
+* compute statistics
+* analyze columns
+* answer dataset questions
+
+Example:
+
+> find rows where A > 100
+> average of column C
+> find row where id = 42
+
+---
+
+## Architecture
+
+```
+Frontend (HTML + JS)
+        │
+        ▼
+Flask backend (Python)
+        │
+        ├── SQLite (tables + sort cache)
+        │
+        └── LLM (Ollama / DeepSeek)
+```
+
+---
+
+## Installation
+
+### Clone
+
+```
+git clone https://github.com/yourrepo/tabrix
+cd tabrix
+```
+
+### Install dependencies
+
+```
+pip install flask pandas openpyxl requests
+```
+
+### Run
+
+```
 python app.py
 ```
 
-После запуска откройте:
+Open:
 
-```text
-http://127.0.0.1:5000
+```
+http://localhost:5000
 ```
 
-## Ollama
+---
 
-По умолчанию ожидается:
+## LLM Support (Ollama)
 
-- URL: `http://127.0.0.1:11434`
-- модель: `deepseek-r1:8b`
+Install Ollama:
 
-Можно переопределить через переменные окружения:
+https://ollama.ai
 
-```bash
-export OLLAMA_URL=http://127.0.0.1:11434
-export OLLAMA_MODEL=deepseek-r1:8b
+Pull model:
+
+```
+ollama pull deepseek-r1:8b
 ```
 
-Windows:
+Run:
 
-```bat
-set OLLAMA_URL=http://127.0.0.1:11434
-set OLLAMA_MODEL=deepseek-r1:8b
+```
+ollama run deepseek-r1:8b
 ```
 
-## Замечания
+AI will automatically connect to Tabrix.
 
-- сортировка не создаёт новую таблицу и не отдаёт файл на скачивание
-- сортировка отображается прямо в интерфейсе
-- состояние таблиц хранится в памяти процесса, а кэш сортировок хранится в SQLite
-- при изменении ячеек, добавлении строк, удалении строк или удалении таблицы кэш сортировок очищается автоматически
+---
+
+## Database
+
+SQLite database:
+
+```
+tabrix.db
+```
+
+Stores:
+
+* tables
+* metadata
+* sorting cache
+* statistics
+
+---
+
+## License
+
+MIT License
+
+---
+
+## Project Status
+
+Active development 🚧
+Core features implemented
+AI integration working
+Sorting cache implemented
