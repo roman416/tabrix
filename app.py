@@ -744,36 +744,39 @@ def table_overview_payload(table_id: str) -> dict[str, Any]:
 @app.get('/')
 def index():
     return render_template(
-        'overview.html',
+        'app.html',
         title='Табрикс · Обзор',
         page_name='overview',
         section_kicker='Главная панель',
         section_title='Редактор и обзор таблицы',
         section_description='Загружай файлы, правь ячейки, фильтруй строки и считай статистику без плясок вокруг вкладок.',
+        initial_tab='tables',
     )
 
 
 @app.get('/dashboards')
 def dashboards_page():
     return render_template(
-        'dashboards.html',
+        'app.html',
         title='Табрикс · Дашборды',
         page_name='dashboards',
         section_kicker='Визуализация',
         section_title='Автоматические дашборды',
         section_description='Ключевые графики и аналитические карточки по активной таблице на отдельной странице, как и положено взрослому интерфейсу.',
+        initial_tab='dashboards',
     )
 
 
 @app.get('/assistant')
 def assistant_page():
     return render_template(
-        'assistant.html',
+        'app.html',
         title='Табрикс · LLM',
         page_name='assistant',
         section_kicker='Локальная модель',
         section_title='Помощник по данным',
         section_description='Вопросы к таблице через fallback-логику или Ollama, когда она не решила умереть именно сегодня.',
+        initial_tab='dashboards',
     )
 
 

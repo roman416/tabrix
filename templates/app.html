@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title or 'Табрикс' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body data-initial-tab="{{ initial_tab or 'tables' }}">
+  <div class="app">
+    <nav class="topbar">
+      <button class="tab-btn active" data-tab="tables">Таблицы</button>
+      <button class="tab-btn" data-tab="dashboards">Дашборд</button>
+    </nav>
+
+    <section id="tables" class="screen active">
+      <div class="tables-grid" id="tablesGrid"></div>
+
+      <h1 class="dashboard-title">ДАШБОРДИНГ</h1>
+
+      <div class="dashboard-layout">
+        <div class="left-panel">
+          <div class="controls-row stack-gap">
+            <div class="select-wrapper">
+              <button class="select-box" id="selectedTableBox" type="button">
+                <span id="selectedTableName">Выбери таблицу</span>
+                <span class="chev"></span>
+              </button>
+              <div class="select-dropdown hidden" id="tableDropdown"></div>
+            </div>
+
+            <div class="integration-strip">
+              <label class="upload-pill" for="uploadInput">Загрузить таблицу</label>
+              <button class="ghost-btn small-btn" id="refreshTablesBtn" type="button">Обновить</button>
+              <span class="mini-badge" id="assistantHealthBadge">AI: проверка…</span>
+            </div>
+          </div>
+
+          <div class="charts-grid mini-grid" id="miniDashboards"></div>
+
+          <div class="more-link" id="openDashboardBtn">смотреть полный обзор ⟶</div>
+          <div class="status" id="statusText">Подключаем backend…</div>
+        </div>
+
+        <div class="big-card">
+          <div class="big-visual">
+            <div class="big-chart-head">
+              <strong id="bigChartTitle">Общий тренд</strong>
+              <span class="panel-chip" id="bigChartMeta">ожидание данных</span>
+            </div>
+            <svg class="big-line-chart" id="bigLineChart" viewBox="0 0 560 260" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="ai-box">
+            <input type="text" id="quickQuestion" placeholder="спроси у AI по активной таблице" />
+            <button class="send-btn" id="quickSend">↑</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="dashboards" class="screen">
+      <div class="dashboard-head">
+        <button class="ghost-btn" id="backToTablesBtn">← в таблицу</button>
+        <button class="ghost-btn" id="changeTableBtn">выбрать другую таблицу ▾</button>
+      </div>
+
+      <div class="dashboard-kpis" id="dashboardKpis"></div>
+
+      <div class="dashboard-main-grid">
+        <div class="dashboard-panel">
+          <div class="panel-title-row">
+            <h3>Структура колонок</h3>
+            <span class="panel-chip">автоанализ</span>
+          </div>
+          <div class="donut-wrap">
+            <div class="donut-chart" id="donutChart"></div>
+            <div class="donut-legend" id="donutLegend"></div>
+          </div>
+        </div>
+
+        <div class="dashboard-panel">
+          <div class="panel-title-row">
+            <h3 id="barChartTitle">Динамика по первым числовым колонкам</h3>
+            <span class="panel-chip" id="barChartMeta">считается из preview</span>
+          </div>
+          <div class="bar-chart" id="trendBars"></div>
+          <div class="x-axis" id="trendAxis"></div>
+        </div>
+      </div>
+
+      <div class="dashboard-main-grid two-panels-wide">
+        <div class="dashboard-panel">
+          <div class="panel-title-row panel-wrap">
+            <div>
+              <h3>Операции с таблицей</h3>
+              <span class="panel-chip">backend подключён</span>
+            </div>
+            <div class="toolbar-cluster">
+              <select id="sortColumn"></select>
+              <select id="sortDirection">
+                <option value="asc">По возрастанию</option>
+                <option value="desc">По убыванию</option>
+              </select>
+              <button id="sortBtn" type="button">Сортировать</button>
+              <button id="addRowBtn" class="ghost-btn" type="button">Добавить строку</button>
+            </div>
+          </div>
+          <div class="status compact-status" id="sortResult">Можно сортировать, редактировать и просматривать таблицу.</div>
+          <div class="download-slot" id="sortDownloadSlot"></div>
+          <div class="preset-list" id="presetList"></div>
+        </div>
+
+        <div class="dashboard-panel">
+          <div class="panel-title-row panel-wrap">
+            <div>
+              <h3 id="previewTitle">Предпросмотр данных</h3>
+              <span class="panel-chip" id="previewMeta">первые строки</span>
+            </div>
+            <div class="toolbar-cluster wide-toolbar">
+              <input id="previewSearch" type="text" placeholder="Поиск по строкам" />
+              <select id="previewPageSize">
+                <option value="25">25 строк</option>
+                <option value="50" selected>50 строк</option>
+                <option value="100">100 строк</option>
+              </select>
+              <input id="gotoPageInput" type="number" min="1" placeholder="Страница" />
+              <button id="gotoPageBtn" class="ghost-btn" type="button">Перейти</button>
+              <input id="gotoCellInput" type="text" placeholder="Ячейка B12" />
+              <button id="gotoCellBtn" class="ghost-btn" type="button">Найти</button>
+              <button id="reloadPreviewBtn" class="ghost-btn" type="button">Обновить</button>
+            </div>
+          </div>
+          <div class="table-preview-wrap" id="previewWrap">
+            <table class="data-table" id="dataTable"></table>
+          </div>
+          <div class="table-footer dashboard-footer">
+            <button id="prevPageBtn" class="ghost-btn" type="button">← назад</button>
+            <div id="pageInfo">0-0</div>
+            <button id="nextPageBtn" class="ghost-btn" type="button">вперёд →</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-bottom-panel">
+        <div class="panel-title-row panel-wrap">
+          <div>
+            <h3>Подробный чат с ИИ-ассистентом</h3>
+            <span class="panel-chip">Ollama + fallback</span>
+          </div>
+          <div class="toolbar-cluster">
+            <select id="statsColumn"></select>
+            <button id="statsBtn" class="ghost-btn" type="button">Статистика колонки</button>
+            <label class="checkbox-pill"><input id="useOllama" type="checkbox" checked /> использовать Ollama</label>
+          </div>
+        </div>
+
+        <div class="assistant-hint-grid">
+          <div class="hint-card" data-prompt="Сделай сводку по этой таблице">Сделай сводку по этой таблице</div>
+          <div class="hint-card" data-prompt="Какие здесь ключевые метрики">Какие здесь ключевые метрики</div>
+          <div class="hint-card" data-prompt="Что можно визуализировать">Что можно визуализировать</div>
+          <div class="hint-card" data-prompt="Какой дашборд лучше собрать">Какой дашборд лучше собрать</div>
+        </div>
+
+        <div class="assistant-log detailed" id="dashboardAssistantLog">
+          <div class="message bot">Привет. Я уже подключён к backend: могу анализировать активную таблицу, считать статистику и ходить в Ollama, если она доступна.</div>
+        </div>
+
+        <div class="assistant-controls">
+          <input id="dashboardAssistantInput" type="text" placeholder="Напиши запрос по таблице или дашборду..." />
+          <button id="dashboardAssistantSend" type="button">Отправить</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <input type="file" id="uploadInput" class="hidden" accept=".csv,.tsv,.xlsx,.xls,.xlsm,.parquet" />
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

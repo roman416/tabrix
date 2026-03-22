@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title or 'Табрикс' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-page="{{ page_name }}">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand glass">
+        <div class="brand-mark">▦</div>
+        <div>
+          <h1>Табрикс</h1>
+          <p>Веб-интерфейс для больших таблиц без фирменной тоски офисных комбайнов.</p>
+        </div>
+      </div>
+
+      <div class="upload-card glass">
+        <label for="fileInput" class="label">Загрузить таблицу</label>
+        <input id="fileInput" type="file" accept=".csv,.tsv,.xlsx,.xls,.xlsm,.parquet" />
+        <button id="uploadBtn">Импортировать</button>
+        <div id="uploadStatus" class="muted">Поддержка CSV, XLSX, XLS, TSV и Parquet.</div>
+      </div>
+
+      <div class="nav-card glass">
+        <div class="panel-header compact-header">
+          <h3>Разделы</h3>
+        </div>
+        <nav class="page-nav">
+          <a href="{{ url_for('index') }}" class="page-link {% if page_name == 'overview' %}active{% endif %}">Обзор</a>
+          <a href="{{ url_for('dashboards_page') }}" class="page-link {% if page_name == 'dashboards' %}active{% endif %}">Дашборды</a>
+          <a href="{{ url_for('assistant_page') }}" class="page-link {% if page_name == 'assistant' %}active{% endif %}">Помощник</a>
+        </nav>
+      </div>
+
+      <div class="tables-panel glass">
+        <div class="panel-header">
+          <h3>Таблицы</h3>
+          <button id="refreshTablesBtn" class="ghost-btn">Обновить</button>
+        </div>
+        <div id="tablesList" class="tables-list"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="page-hero glass">
+        <div>
+          <div class="eyebrow">{{ section_kicker }}</div>
+          <h2>{{ section_title }}</h2>
+          <p>{{ section_description }}</p>
+        </div>
+      </header>
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
