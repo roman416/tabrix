@@ -120,9 +120,20 @@ function hideUploadOverlay() {
 
 
 function addMessage(text, who = 'bot') {
+  if (!els.assistantLog) return null;
   const message = document.createElement('div');
   message.className = `message ${who}`;
   message.textContent = text;
+  els.assistantLog.appendChild(message);
+  els.assistantLog.scrollTop = els.assistantLog.scrollHeight;
+  return message;
+}
+
+function addTypingMessage() {
+  if (!els.assistantLog) return null;
+  const message = document.createElement('div');
+  message.className = 'message bot typing';
+  message.textContent = 'Печатает…';
   els.assistantLog.appendChild(message);
   els.assistantLog.scrollTop = els.assistantLog.scrollHeight;
   return message;
@@ -553,10 +564,11 @@ async function refreshAssistantStatus() {
   try {
     const data = await fetchJSON('/api/assistant/status');
     state.assistantStatus = data;
-    if (els.assistantHealthBadge) els.assistantHealthBadge.textContent = data.ok ? `${data.model_present ? 'Готово' : 'Готово'}` : 'fallback';
+    if (els.assistantHealthBadge) els.assistantHealthBadge.textContent = data.ok ? (data.model_present ? `Модель: ${data.model}` : `Нет модели: ${data.model}`) : `Fallback`;
+    if (data.error) setStatus(`ИИ недоступен: ${data.error}`);
   } catch (error) {
     state.assistantStatus = { ok: false, error: error.message };
-    if (els.assistantHealthBadge) els.assistantHealthBadge.textContent = 'fallback';
+    if (els.assistantHealthBadge) els.assistantHealthBadge.textContent = 'Fallback';
   }
   renderKpis();
 }
@@ -576,7 +588,9 @@ async function sendAssistantQuestion(text) {
       }),
     });
     if (typing) typing.remove();
-    const msg = addMessage(`${data.answer}`, 'bot');
+    const suffix = data.warning ? `\n\n[заметка] ${data.warning}` : '';
+    const prefix = data.source === 'ollama' ? '' : '[fallback] ';
+    const msg = addMessage(`${prefix}${data.answer}${suffix}`, 'bot');
     if (msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (error) {
     if (typing) typing.remove();

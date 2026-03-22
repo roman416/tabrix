@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -32,6 +33,7 @@ SORT_CACHE_VERSION = 1
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 
 
 @dataclass
@@ -192,6 +194,53 @@ def normalize_value(value: Any) -> Any:
     if isinstance(value, (pd.Timestamp,)):
         return value.isoformat()
     return value
+
+
+def parse_bool(value: Any, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'да'}
+
+
+def summarize_ollama_error(exc: Exception) -> str:
+    text = str(exc).strip() or exc.__class__.__name__
+    lowered = text.lower()
+    if 'failed to establish a new connection' in lowered or 'connection refused' in lowered:
+        return 'Ollama не запущена или недоступна по адресу ' + DEFAULT_OLLAMA_URL
+    if 'read timed out' in lowered or 'timed out' in lowered:
+        return 'Ollama не ответила вовремя. Модель слишком долго думает или зависла.'
+    if '404' in lowered and 'generate' in lowered:
+        return 'Ollama доступна, но API /api/generate недоступен. Проверь версию Ollama.'
+    return text
+
+
+def get_ollama_status() -> dict[str, Any]:
+    try:
+        response = requests.get(f'{DEFAULT_OLLAMA_URL}/api/tags', timeout=10)
+        response.raise_for_status()
+        models = response.json().get('models', [])
+        names = [m.get('name') for m in models if m.get('name')]
+        return {
+            'ok': True,
+            'url': DEFAULT_OLLAMA_URL,
+            'model': DEFAULT_OLLAMA_MODEL,
+            'available_models': names,
+            'model_present': DEFAULT_OLLAMA_MODEL in names,
+            'error': None,
+        }
+    except Exception as exc:
+        return {
+            'ok': False,
+            'url': DEFAULT_OLLAMA_URL,
+            'model': DEFAULT_OLLAMA_MODEL,
+            'error': summarize_ollama_error(exc),
+            'model_present': False,
+            'available_models': [],
+        }
 
 
 
@@ -998,52 +1047,50 @@ def assistant():
     payload = request.get_json(silent=True) or {}
     table_id = payload.get('table_id')
     question = str(payload.get('question', '')).strip()
-    use_ollama = bool(payload.get('use_ollama', True))
+    use_ollama = parse_bool(payload.get('use_ollama'), True)
 
     if not question:
         return jsonify({'error': 'Вопрос пустой'}), 400
 
     context = build_llm_context(table_id, question)
-
     fallback = build_fallback_answer(question, context)
 
     if not use_ollama:
-        return jsonify({'answer': fallback, 'source': 'python_fallback'})
+        return jsonify({'answer': fallback, 'source': 'python_fallback', 'model': None, 'warning': 'Используется локальный fallback без модели.'})
+
+    status = get_ollama_status()
+    if not status.get('ok'):
+        return jsonify({
+            'answer': fallback,
+            'source': 'python_fallback',
+            'model': DEFAULT_OLLAMA_MODEL,
+            'warning': status.get('error') or 'Ollama недоступна.',
+        })
+
+    if not status.get('model_present'):
+        return jsonify({
+            'answer': fallback,
+            'source': 'python_fallback',
+            'model': DEFAULT_OLLAMA_MODEL,
+            'warning': f"Модель {DEFAULT_OLLAMA_MODEL} не найдена в Ollama. Доступные модели: {', '.join(status.get('available_models', [])) or 'нет'}",
+        })
 
     try:
         answer = ask_ollama(question, context)
         return jsonify({'answer': answer, 'source': 'ollama', 'model': DEFAULT_OLLAMA_MODEL})
     except Exception as exc:
+        logging.exception('Ошибка при запросе к Ollama')
         return jsonify({
             'answer': fallback,
-            'source': 'local',
+            'source': 'python_fallback',
             'model': DEFAULT_OLLAMA_MODEL,
+            'warning': summarize_ollama_error(exc),
         })
 
 
 @app.get('/api/assistant/status')
 def assistant_status():
-    try:
-        response = requests.get(f'{DEFAULT_OLLAMA_URL}/api/tags', timeout=10)
-        response.raise_for_status()
-        models = response.json().get('models', [])
-        names = [m.get('name') for m in models if m.get('name')]
-        return jsonify({
-            'ok': True,
-            'url': DEFAULT_OLLAMA_URL,
-            'model': DEFAULT_OLLAMA_MODEL,
-            'available_models': names,
-            'model_present': DEFAULT_OLLAMA_MODEL in names,
-        })
-    except Exception as exc:
-        return jsonify({
-            'ok': False,
-            'url': DEFAULT_OLLAMA_URL,
-            'model': DEFAULT_OLLAMA_MODEL,
-            'error': str(exc),
-            'model_present': False,
-            'available_models': [],
-        })
+    return jsonify(get_ollama_status())
 
 
 
@@ -1111,15 +1158,31 @@ def ask_ollama(question: str, context: dict[str, Any]) -> str:
         f"Контекст таблицы:\n{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
         f'Вопрос пользователя: {question}'
     )
-    response = requests.post(
-        f'{DEFAULT_OLLAMA_URL}/api/generate',
-        json={'model': DEFAULT_OLLAMA_MODEL, 'prompt': prompt, 'stream': False},
-        timeout=180,
-    )
+
+    payload = {
+        'model': DEFAULT_OLLAMA_MODEL,
+        'prompt': prompt,
+        'stream': False,
+        'options': {
+            'temperature': 0.2,
+        },
+    }
+    response = requests.post(f'{DEFAULT_OLLAMA_URL}/api/generate', json=payload, timeout=180)
     response.raise_for_status()
     data = response.json()
-    answer = data.get('response', 'Пустой ответ от Ollama')
-    return strip_think_blocks(answer) or 'Ollama вернула пустой ответ.'
+
+    answer = data.get('response')
+    if answer is None and isinstance(data.get('message'), dict):
+        answer = data['message'].get('content')
+    if answer is None and 'messages' in data and isinstance(data['messages'], list) and data['messages']:
+        last_message = data['messages'][-1]
+        if isinstance(last_message, dict):
+            answer = last_message.get('content')
+
+    cleaned = strip_think_blocks(str(answer or '')).strip()
+    if not cleaned:
+        raise RuntimeError('Ollama вернула пустой ответ.')
+    return cleaned
 
 
 @app.get('/download/<path:filename>')
