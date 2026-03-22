@@ -3,11 +3,74 @@
 <section class="content-card glass">
   <div class="panel-header">
     <div>
-      <h3>Автодашборды</h3>
-      <div class="muted helper-text">Короткая аналитика по активной таблице. Машина рисует графики, люди делают вид, что это инсайт.</div>
+      <h3>Дашбординг</h3>
+      <div class="muted helper-text">Графики и аналитические карточки по выбранной таблице.</div>
+    </div>
+    <div id="activeTableMeta" class="muted helper-text"></div>
+  </div>
+
+  <div class="dashboard-top-grid">
+    <div id="dashboardKpis" class="dashboard-kpis"></div>
+  </div>
+
+  <div class="dashboard-visual-grid">
+    <div class="dashboard-card">
+      <div class="panel-title-row">
+        <h4>Структура колонок</h4>
+      </div>
+      <div class="donut-block">
+        <div id="donutChart" class="donut-chart"></div>
+        <div id="donutLegend" class="donut-legend"></div>
+      </div>
+    </div>
+
+    <div class="dashboard-card">
+      <div class="panel-title-row">
+        <h4 id="barChartTitle">Динамика</h4>
+        <div id="barChartMeta" class="muted small-text"></div>
+      </div>
+      <div id="trendBars" class="trend-bars"></div>
+      <div id="trendAxis" class="trend-axis"></div>
     </div>
   </div>
-  <div id="activeTableMeta" class="muted helper-text"></div>
-  <div id="dashboardCards" class="dashboard-grid"></div>
+
+  <div class="dashboard-card big-card">
+    <div class="panel-title-row">
+      <h4 id="bigChartTitle">Общий тренд</h4>
+      <div id="bigChartMeta" class="muted small-text"></div>
+    </div>
+    <svg id="bigLineChart" class="big-line-chart" viewBox="0 0 560 260" preserveAspectRatio="none"></svg>
+  </div>
+
+  <div class="panel-header">
+    <div>
+      <h3>Примеры дашбордов</h3>
+      <div class="muted helper-text">Открой карточку, чтобы показать пояснение и прокрутку к ответу.</div>
+    </div>
+  </div>
+  <div id="presetList" class="dashboard-grid"></div>
+
+  <div class="dashboard-assistant">
+    <div class="sidebar-title">ИИ по дашборду</div>
+    <div id="dashboardAssistantLog" class="assistant-log mini-log">
+      <div class="message bot">Всё готово, жду вопросов.</div>
+    </div>
+    <div class="assistant-mini-row">
+      <input id="dashboardAssistantInput" type="text" placeholder="Спроси про графики или конкретную ячейку" />
+      <button id="dashboardAssistantSend" class="send-btn">↑</button>
+    </div>
+  </div>
+
+  <div class="hidden" id="miniDashboards"></div>
+  <div class="hidden" id="selectedTableName"></div>
+  <div class="hidden" id="tableDropdown"></div>
+  <button id="selectedTableBox" class="hidden"></button>
+  <div id="statusText" class="hidden"></div>
+  <button id="openDashboardBtn" class="hidden"></button>
+  <button id="backToTablesBtn" class="hidden"></button>
+  <button id="changeTableBtn" class="hidden"></button>
+  <input id="quickQuestion" class="hidden" />
+  <button id="quickSend" class="hidden"></button>
+  <div id="previewTitle" class="hidden"></div>
 </section>
 {% endblock %}

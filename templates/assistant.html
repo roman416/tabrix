@@ -3,18 +3,18 @@
 <section class="content-card assistant-card glass">
   <div class="panel-header">
     <div>
-      <h3>Локальный помощник</h3>
+      <h3>ИИ-ассистент</h3>
       <div id="activeTableMeta" class="muted helper-text"></div>
     </div>
-    <div id="assistantStatus" class="muted"></div>
+    <div id="assistantStatus" class="muted">Всё готово, жду вопросов.</div>
   </div>
-  <div id="assistantLog" class="assistant-log">
-    <div class="message bot">Загрузи таблицу и спрашивай не только про колонки и суммы, но и про конкретные ячейки вроде <strong>B12</strong>, про страницу из 100 строк, про всю строку по значению одной ячейки и про статистику по фильтру вроде <strong>A&gt;100</strong>. Модель по умолчанию: <strong>deepseek-r1:8b</strong>.</div>
+  <div id="assistantLog" class="assistant-log page-log">
+    <div class="message bot">Всё готово, жду вопросов.</div>
   </div>
   <div class="assistant-controls">
-    <input id="assistantInput" type="text" placeholder="Например: что в ячейке B12? или покажи статистику, где A>100" />
-    <label class="checkbox-row"><input id="useOllama" type="checkbox" checked /> использовать Ollama</label>
-    <button id="assistantSend">Отправить</button>
+    <input id="assistantInput" type="text" placeholder="Например: что в ячейке B12? или покажи статистику, где A > 100" />
+    <label class="checkbox-row"><input id="useOllama" type="checkbox" checked /> использовать модель</label>
+    <button id="assistantSend" class="primary-btn">Отправить</button>
   </div>
 </section>
 {% endblock %}

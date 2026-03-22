@@ -7,11 +7,27 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
 </head>
 <body data-initial-tab="{{ initial_tab or 'tables' }}">
+  <div id="uploadOverlay" class="upload-overlay hidden">
+    <div class="upload-modal">
+      <div class="spinner"></div>
+      <div id="uploadOverlayText" class="upload-overlay-text">Загрузка таблицы…</div>
+    </div>
+  </div>
+
   <div class="app">
-    <nav class="topbar">
-      <button class="tab-btn active" data-tab="tables">Таблицы</button>
-      <button class="tab-btn" data-tab="dashboards">Дашборд</button>
-    </nav>
+    <header class="app-header">
+      <a href="{{ url_for('index') }}" class="brand-link">
+        <div class="brand-box">
+          <img src="{{ url_for('static', filename='Vector 29.png') }}" alt="Табрикс" class="brand-icon" />
+          <img src="{{ url_for('static', filename='Табрикс.png') }}" alt="Табрикс" class="brand-wordmark" />
+        </div>
+      </a>
+
+      <nav class="topbar">
+        <button class="tab-btn active" data-tab="tables">Таблицы</button>
+        <button class="tab-btn" data-tab="dashboards">Дашборд</button>
+      </nav>
+    </header>
 
     <section id="tables" class="screen active">
       <div class="tables-grid" id="tablesGrid"></div>
@@ -32,14 +48,14 @@
             <div class="integration-strip">
               <label class="upload-pill" for="uploadInput">Загрузить таблицу</label>
               <button class="ghost-btn small-btn" id="refreshTablesBtn" type="button">Обновить</button>
-              <span class="mini-badge" id="assistantHealthBadge">AI: проверка…</span>
+              <span class="mini-badge" id="assistantHealthBadge">Всё готово, жду вопросов.</span>
             </div>
           </div>
 
           <div class="charts-grid mini-grid" id="miniDashboards"></div>
 
           <div class="more-link" id="openDashboardBtn">смотреть полный обзор ⟶</div>
-          <div class="status" id="statusText">Подключаем backend…</div>
+          <div class="status" id="statusText">Выбери таблицу или загрузи новую.</div>
         </div>
 
         <div class="big-card">
@@ -51,7 +67,7 @@
             <svg class="big-line-chart" id="bigLineChart" viewBox="0 0 560 260" preserveAspectRatio="none"></svg>
           </div>
           <div class="ai-box">
-            <input type="text" id="quickQuestion" placeholder="спроси у AI по активной таблице" />
+            <input type="text" id="quickQuestion" placeholder="спроси по активной таблице или ячейке, например B12" />
             <button class="send-btn" id="quickSend">↑</button>
           </div>
         </div>
@@ -93,7 +109,7 @@
           <div class="panel-title-row panel-wrap">
             <div>
               <h3>Операции с таблицей</h3>
-              <span class="panel-chip">backend подключён</span>
+              <span class="panel-chip">редактирование и сортировка</span>
             </div>
             <div class="toolbar-cluster">
               <select id="sortColumn"></select>
@@ -145,12 +161,12 @@
         <div class="panel-title-row panel-wrap">
           <div>
             <h3>Подробный чат с ИИ-ассистентом</h3>
-            <span class="panel-chip">Ollama + fallback</span>
+            <span class="panel-chip">всё готово, жду вопросов</span>
           </div>
           <div class="toolbar-cluster">
             <select id="statsColumn"></select>
             <button id="statsBtn" class="ghost-btn" type="button">Статистика колонки</button>
-            <label class="checkbox-pill"><input id="useOllama" type="checkbox" checked /> использовать Ollama</label>
+            <label class="checkbox-pill"><input id="useOllama" type="checkbox" checked /> использовать модель</label>
           </div>
         </div>
 
@@ -158,11 +174,11 @@
           <div class="hint-card" data-prompt="Сделай сводку по этой таблице">Сделай сводку по этой таблице</div>
           <div class="hint-card" data-prompt="Какие здесь ключевые метрики">Какие здесь ключевые метрики</div>
           <div class="hint-card" data-prompt="Что можно визуализировать">Что можно визуализировать</div>
-          <div class="hint-card" data-prompt="Какой дашборд лучше собрать">Какой дашборд лучше собрать</div>
+          <div class="hint-card" data-prompt="Что в ячейке B12?">Что в ячейке B12?</div>
         </div>
 
         <div class="assistant-log detailed" id="dashboardAssistantLog">
-          <div class="message bot">Привет. Я уже подключён к backend: могу анализировать активную таблицу, считать статистику и ходить в Ollama, если она доступна.</div>
+          <div class="message bot">Всё готово, жду вопросов.</div>
         </div>
 
         <div class="assistant-controls">

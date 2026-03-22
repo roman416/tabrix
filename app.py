@@ -4,8 +4,7 @@ import csv
 import json
 import os
 import re
-import shutil
-import subprocess
+import sqlite3
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,14 +21,14 @@ UPLOAD_DIR = BASE_DIR / 'uploads'
 UPLOAD_DIR.mkdir(exist_ok=True)
 CSV_CACHE_DIR = UPLOAD_DIR / '_csv_cache'
 CSV_CACHE_DIR.mkdir(exist_ok=True)
-TOOLS_DIR = BASE_DIR / 'native_tools'
+DB_PATH = BASE_DIR / 'tabrix.db'
 
 ALLOWED_EXTENSIONS = {'.csv', '.tsv', '.xlsx', '.xls', '.xlsm', '.parquet'}
 DEFAULT_OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://127.0.0.1:11434')
 DEFAULT_OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'deepseek-r1:8b')
 MAX_PREVIEW_ROWS = 300
 DEFAULT_PREVIEW_ROWS = 50
-EXTERNAL_TOOL_TIMEOUT = 180
+SORT_CACHE_VERSION = 1
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
@@ -50,6 +49,96 @@ class TableInfo:
 
 TABLE_REGISTRY: dict[str, TableInfo] = {}
 DATAFRAME_CACHE: dict[str, pd.DataFrame] = {}
+
+
+def get_db_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    with get_db_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sort_cache (
+                table_id TEXT NOT NULL,
+                column_name TEXT NOT NULL,
+                ascending INTEGER NOT NULL,
+                cache_version INTEGER NOT NULL DEFAULT 1,
+                row_order_json TEXT NOT NULL,
+                row_count INTEGER NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (table_id, column_name, ascending)
+            )
+        """)
+        conn.commit()
+
+
+
+
+init_db()
+
+
+def invalidate_sort_cache(table_id: str) -> None:
+    with get_db_connection() as conn:
+        conn.execute('DELETE FROM sort_cache WHERE table_id = ?', (table_id,))
+        conn.commit()
+
+
+def get_cached_sort_order(table_id: str, column: str, ascending: bool, expected_rows: int) -> list[int] | None:
+    with get_db_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT row_order_json, row_count, cache_version
+            FROM sort_cache
+            WHERE table_id = ? AND column_name = ? AND ascending = ?
+            """,
+            (table_id, column, 1 if ascending else 0),
+        ).fetchone()
+    if not row:
+        return None
+    if int(row['row_count']) != int(expected_rows) or int(row['cache_version']) != SORT_CACHE_VERSION:
+        invalidate_sort_cache(table_id)
+        return None
+    try:
+        order = json.loads(row['row_order_json'])
+    except json.JSONDecodeError:
+        invalidate_sort_cache(table_id)
+        return None
+    if not isinstance(order, list) or len(order) != expected_rows:
+        invalidate_sort_cache(table_id)
+        return None
+    return [int(item) for item in order]
+
+
+def save_sort_order(table_id: str, column: str, ascending: bool, row_order: list[int]) -> None:
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO sort_cache (table_id, column_name, ascending, cache_version, row_order_json, row_count)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(table_id, column_name, ascending) DO UPDATE SET
+                cache_version = excluded.cache_version,
+                row_order_json = excluded.row_order_json,
+                row_count = excluded.row_count,
+                created_at = CURRENT_TIMESTAMP
+            """,
+            (table_id, column, 1 if ascending else 0, SORT_CACHE_VERSION, json.dumps(row_order), len(row_order)),
+        )
+        conn.commit()
+
+
+def get_sorted_df(table_id: str, column: str, ascending: bool) -> tuple[pd.DataFrame, str]:
+    df = get_df(table_id)
+    order = get_cached_sort_order(table_id, column, ascending, len(df))
+    if order is not None:
+        return df.iloc[order].copy(), 'db_cache'
+
+    sorted_df = df.sort_values(by=column, ascending=ascending, kind='mergesort', na_position='last').copy()
+    row_order = [int(idx) for idx in sorted_df.index.tolist()]
+    save_sort_order(table_id, column, ascending, row_order)
+    return sorted_df, 'computed_and_cached'
+
 
 PIVOT_AGG_MAP = {
     'count': 'count',
@@ -223,6 +312,7 @@ def save_table(info: TableInfo, df: pd.DataFrame) -> None:
     info.column_names = [str(c) for c in df.columns]
     info.dtypes = {str(c): str(df[c].dtype) for c in df.columns}
     info.file_size = info.path.stat().st_size if info.path.exists() else info.file_size
+    invalidate_sort_cache(info.table_id)
 
 
 
@@ -382,163 +472,6 @@ def restore_typed_value(raw_value: str | None, series: pd.Series) -> Any:
     if pd.api.types.is_datetime64_any_dtype(series.dtype):
         return pd.to_datetime(raw_value).isoformat()
     return raw_value
-
-
-
-def resolve_tool_path(tool_name: str) -> Path | None:
-    candidates: list[Path] = []
-    if os.name == 'nt':
-        candidates.extend([
-            TOOLS_DIR / 'windows' / f'{tool_name}.exe',
-            TOOLS_DIR / f'{tool_name}.exe',
-        ])
-    else:
-        candidates.extend([
-            TOOLS_DIR / 'linux' / tool_name,
-            TOOLS_DIR / tool_name,
-        ])
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
-
-def run_external_tool(tool_name: str, args: list[str]) -> subprocess.CompletedProcess[str]:
-    executable = resolve_tool_path(tool_name)
-    if not executable:
-        raise FileNotFoundError(
-            f'Не найден внешний инструмент {tool_name}. Ожидается файл в {TOOLS_DIR}.'
-        )
-
-    command = [str(executable), *args]
-    return subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        encoding='utf-8',
-        errors='replace',
-        timeout=EXTERNAL_TOOL_TIMEOUT,
-        check=False,
-    )
-
-
-
-def parse_sred_stdout(stdout: str) -> dict[str, float]:
-    parts = stdout.strip().split()
-    if len(parts) < 4:
-        raise ValueError(f'Неожиданный ответ от sred: {stdout!r}')
-    min_val, max_val, mean_val, sum_val = map(float, parts[:4])
-    return {'min': min_val, 'max': max_val, 'mean': mean_val, 'sum': sum_val}
-
-
-def cleanup_sort_output(csv_path: Path) -> None:
-    if not csv_path.exists():
-        return
-
-    def fix_cell(value: str) -> str:
-        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
-            return value[1:-1].replace('""', '"')
-        return value
-
-    with csv_path.open('r', newline='', encoding='utf-8-sig') as handle:
-        rows = [[fix_cell(cell) for cell in row] for row in csv.reader(handle)]
-
-    with csv_path.open('w', newline='', encoding='utf-8-sig') as handle:
-        writer = csv.writer(handle)
-        writer.writerows(rows)
-
-
-
-def numeric_metrics_via_external(info: TableInfo, column: str) -> dict[str, float]:
-    column_index = info.column_names.index(column) + 1
-    result = run_external_tool('sred', [str(info.csv_cache_path), str(column_index), '1'])
-    if result.returncode != 0:
-        details = result.stderr.strip() or result.stdout.strip() or 'без текста ошибки'
-        raise RuntimeError(f'sred завершился с кодом {result.returncode}: {details}')
-    return parse_sred_stdout(result.stdout)
-
-
-
-def column_stats_via_csv(info: TableInfo, series: pd.Series, column: str) -> dict[str, Any]:
-    if not info.csv_cache_path.exists():
-        write_csv_cache(get_df(info.table_id), info.csv_cache_path)
-
-    non_empty_values: list[str] = []
-    unique_values: list[str] = []
-    seen_values: set[str] = set()
-    numeric_values: list[float] = []
-
-    with info.csv_cache_path.open('r', newline='', encoding='utf-8-sig') as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            raw_value = row.get(column)
-            if raw_value in (None, ''):
-                continue
-            non_empty_values.append(raw_value)
-            if raw_value not in seen_values:
-                seen_values.add(raw_value)
-                if len(unique_values) < 50:
-                    unique_values.append(raw_value)
-            if pd.api.types.is_numeric_dtype(series.dtype):
-                try:
-                    numeric_values.append(float(raw_value))
-                except ValueError:
-                    pass
-
-    if not non_empty_values:
-        return {
-            'count': 0,
-            'unique_count': 0,
-            'unique_values': [],
-            'sum': None,
-            'int_sum': None,
-            'mean': None,
-            'median': None,
-            'variance_sample': None,
-            'std_sample': None,
-            'min': None,
-            'max': None,
-            'first': None,
-            'last': None,
-        }
-
-    result: dict[str, Any] = {
-        'count': len(non_empty_values),
-        'unique_count': len(seen_values),
-        'unique_values': unique_values,
-        'sum': None,
-        'int_sum': None,
-        'mean': None,
-        'median': None,
-        'variance_sample': None,
-        'std_sample': None,
-        'min': restore_typed_value(min(non_empty_values), series),
-        'max': restore_typed_value(max(non_empty_values), series),
-        'first': restore_typed_value(non_empty_values[0], series),
-        'last': restore_typed_value(non_empty_values[-1], series),
-    }
-
-    if pd.api.types.is_numeric_dtype(series.dtype) and numeric_values:
-        metrics = numeric_metrics_via_external(info, column)
-        numeric_array = np.array(numeric_values, dtype=float)
-        result.update(
-            {
-                'sum': normalize_value(metrics['sum']),
-                'int_sum': int(np.floor(metrics['sum'])),
-                'mean': normalize_value(metrics['mean']),
-                'median': normalize_value(float(np.median(numeric_array))),
-                'variance_sample': normalize_value(float(np.var(numeric_array, ddof=1))) if len(numeric_array) > 1 else None,
-                'std_sample': normalize_value(float(np.std(numeric_array, ddof=1))) if len(numeric_array) > 1 else None,
-                'min': normalize_value(metrics['min']),
-                'max': normalize_value(metrics['max']),
-                'first': restore_typed_value(non_empty_values[0], series),
-                'last': restore_typed_value(non_empty_values[-1], series),
-            }
-        )
-
-    return result
 
 
 
@@ -807,7 +740,7 @@ def upload_table():
 
     df = DATAFRAME_CACHE[info.table_id]
     return jsonify({
-        'message': 'Таблица загружена и нормализована в CSV для внешних C-инструментов',
+        'message': 'Таблица загружена.',
         'table': info_to_dict(info),
         'preview': dataframe_to_records(df, 15, include_row_id=True),
         'column_groups': detect_column_groups(df),
@@ -835,7 +768,17 @@ def table_preview(table_id: str):
     offset = max(int(request.args.get('offset', 0)), 0)
     query = str(request.args.get('query', '')).strip().lower()
 
+    sort_column = str(request.args.get('sort_column', '')).strip()
+    sort_direction = str(request.args.get('sort_direction', 'asc')).strip().lower()
+    ascending = sort_direction != 'desc'
+
     work = df
+    sort_source = None
+    if sort_column:
+        if sort_column not in df.columns:
+            return jsonify({'error': 'Колонка сортировки не найдена'}), 404
+        work, sort_source = get_sorted_df(table_id, sort_column, ascending)
+
     if query:
         mask = pd.Series(False, index=work.index)
         for col in work.columns:
@@ -848,6 +791,8 @@ def table_preview(table_id: str):
         'offset': offset,
         'limit': limit,
         'query': query,
+        'sort': {'column': sort_column or None, 'ascending': ascending} if sort_column else None,
+        'sort_source': sort_source,
     })
 
 
@@ -857,15 +802,8 @@ def column_stats(table_id: str, column: str):
     if column not in df.columns:
         return jsonify({'error': 'Колонка не найдена'}), 404
 
-    info = TABLE_REGISTRY[table_id]
-    try:
-        stats = column_stats_via_csv(info, df[column], column)
-        source = 'csv_external_engine' if pd.api.types.is_numeric_dtype(df[column]) else 'csv_cache'
-    except Exception as exc:
-        stats = series_stats(df[column])
-        source = f'python_fallback: {exc}'
-
-    return jsonify({'column': column, 'stats': stats, 'source': source})
+    stats = series_stats(df[column])
+    return jsonify({'column': column, 'stats': stats, 'source': 'python'})
 
 
 @app.post('/api/table/<table_id>/sort')
@@ -882,37 +820,13 @@ def sort_table(table_id: str):
     if not column or column not in df.columns:
         return jsonify({'error': 'Укажи корректную колонку сортировки'}), 400
 
-    output_name = f"{Path(info.name).stem}_sorted_{column}.csv"
-    output_path = UPLOAD_DIR / safe_filename(output_name)
-
-    try:
-        result = run_external_tool(
-            'sort',
-            [
-                str(info.csv_cache_path),
-                str(output_path),
-                str(info.column_names.index(column) + 1),
-                '1' if ascending else '0',
-            ],
-        )
-        if result.returncode != 0:
-            details = result.stderr.strip() or result.stdout.strip() or 'без текста ошибки'
-            raise RuntimeError(f'sort завершился с кодом {result.returncode}: {details}')
-        cleanup_sort_output(output_path)
-        sorted_df = pd.read_csv(output_path, encoding='utf-8-sig')
-        message = 'Сортировка выполнена через внешний C/EXE инструмент'
-        source = 'external_sort_tool'
-    except Exception as exc:
-        sorted_df = df.sort_values(by=column, ascending=ascending, kind='mergesort')
-        sorted_df.to_csv(output_path, index=False)
-        message = f'Сортировка выполнена через Python fallback, потому что внешний инструмент недоступен: {exc}'
-        source = 'python_fallback'
-
+    sorted_df, source = get_sorted_df(table_id, column, ascending)
     return jsonify({
-        'message': message,
-        'download_url': f'/download/{output_path.name}',
+        'message': 'Сортировка готова и сохранена в базе данных.',
         'preview': dataframe_to_records(sorted_df, 25, include_row_id=True),
         'source': source,
+        'sort': {'column': column, 'ascending': ascending},
+        'table': info_to_dict(info),
     })
 
 
@@ -1038,6 +952,7 @@ def delete_table(table_id: str):
     DATAFRAME_CACHE.pop(table_id, None)
     if not info:
         return jsonify({'error': 'Таблица не найдена'}), 404
+    invalidate_sort_cache(table_id)
     info.path.unlink(missing_ok=True)
     info.csv_cache_path.unlink(missing_ok=True)
     return jsonify({'message': 'Таблица удалена', 'table_id': table_id})
@@ -1100,8 +1015,8 @@ def assistant():
         return jsonify({'answer': answer, 'source': 'ollama', 'model': DEFAULT_OLLAMA_MODEL})
     except Exception as exc:
         return jsonify({
-            'answer': f'{fallback}\n\nOllama сейчас не ответила: {exc}',
-            'source': 'python_fallback',
+            'answer': fallback,
+            'source': 'local',
             'model': DEFAULT_OLLAMA_MODEL,
         })
 

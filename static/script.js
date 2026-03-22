@@ -11,62 +11,68 @@ const state = {
   highlightedCell: null,
   dashboardCards: [],
   assistantStatus: null,
+  currentSort: null,
 };
 
 const byId = (id) => document.getElementById(id);
+const byAny = (...ids) => ids.map((id) => document.getElementById(id)).find(Boolean) || null;
 const els = {
-  tablesGrid: byId('tablesGrid'),
-  selectedTableBox: byId('selectedTableBox'),
-  selectedTableName: byId('selectedTableName'),
-  tableDropdown: byId('tableDropdown'),
-  statusText: byId('statusText'),
-  uploadInput: byId('uploadInput'),
-  refreshTablesBtn: byId('refreshTablesBtn'),
-  assistantHealthBadge: byId('assistantHealthBadge'),
-  miniDashboards: byId('miniDashboards'),
-  openDashboardBtn: byId('openDashboardBtn'),
-  bigChartTitle: byId('bigChartTitle'),
-  bigChartMeta: byId('bigChartMeta'),
-  bigLineChart: byId('bigLineChart'),
-  dashboardKpis: byId('dashboardKpis'),
-  donutChart: byId('donutChart'),
-  donutLegend: byId('donutLegend'),
-  barChartTitle: byId('barChartTitle'),
-  barChartMeta: byId('barChartMeta'),
-  trendBars: byId('trendBars'),
-  trendAxis: byId('trendAxis'),
-  presetList: byId('presetList'),
-  previewTitle: byId('previewTitle'),
-  previewMeta: byId('previewMeta'),
-  dataTable: byId('dataTable'),
-  previewWrap: byId('previewWrap'),
-  pageInfo: byId('pageInfo'),
-  prevPageBtn: byId('prevPageBtn'),
-  nextPageBtn: byId('nextPageBtn'),
-  previewSearch: byId('previewSearch'),
-  previewPageSize: byId('previewPageSize'),
-  gotoPageInput: byId('gotoPageInput'),
-  gotoPageBtn: byId('gotoPageBtn'),
-  gotoCellInput: byId('gotoCellInput'),
-  gotoCellBtn: byId('gotoCellBtn'),
-  reloadPreviewBtn: byId('reloadPreviewBtn'),
-  sortColumn: byId('sortColumn'),
-  sortDirection: byId('sortDirection'),
-  sortBtn: byId('sortBtn'),
-  addRowBtn: byId('addRowBtn'),
-  sortResult: byId('sortResult'),
-  sortDownloadSlot: byId('sortDownloadSlot'),
-  statsColumn: byId('statsColumn'),
-  statsBtn: byId('statsBtn'),
-  quickQuestion: byId('quickQuestion'),
-  quickSend: byId('quickSend'),
-  assistantLog: byId('dashboardAssistantLog'),
-  assistantInput: byId('dashboardAssistantInput'),
-  assistantSend: byId('dashboardAssistantSend'),
-  useOllama: byId('useOllama'),
-  backToTablesBtn: byId('backToTablesBtn'),
-  changeTableBtn: byId('changeTableBtn'),
+  tablesGrid: byAny('tablesGrid', 'tablesList'),
+  selectedTableBox: byAny('selectedTableBox'),
+  selectedTableName: byAny('selectedTableName', 'activeTableTitle'),
+  tableDropdown: byAny('tableDropdown'),
+  statusText: byAny('statusText', 'uploadStatus'),
+  uploadInput: byAny('uploadInput', 'fileInput'),
+  refreshTablesBtn: byAny('refreshTablesBtn'),
+  assistantHealthBadge: byAny('assistantHealthBadge', 'assistantStatus'),
+  miniDashboards: byAny('miniDashboards'),
+  openDashboardBtn: byAny('openDashboardBtn'),
+  bigChartTitle: byAny('bigChartTitle'),
+  bigChartMeta: byAny('bigChartMeta'),
+  bigLineChart: byAny('bigLineChart'),
+  dashboardKpis: byAny('dashboardKpis'),
+  donutChart: byAny('donutChart'),
+  donutLegend: byAny('donutLegend'),
+  barChartTitle: byAny('barChartTitle'),
+  barChartMeta: byAny('barChartMeta'),
+  trendBars: byAny('trendBars'),
+  trendAxis: byAny('trendAxis'),
+  presetList: byAny('presetList', 'dashboardCards'),
+  previewTitle: byAny('previewTitle'),
+  previewMeta: byAny('previewMeta'),
+  dataTable: byAny('dataTable'),
+  previewWrap: byAny('previewWrap', 'previewTableWrap'),
+  pageInfo: byAny('pageInfo'),
+  prevPageBtn: byAny('prevPageBtn'),
+  nextPageBtn: byAny('nextPageBtn'),
+  previewSearch: byAny('previewSearch'),
+  previewPageSize: byAny('previewPageSize'),
+  gotoPageInput: byAny('gotoPageInput'),
+  gotoPageBtn: byAny('gotoPageBtn'),
+  gotoCellInput: byAny('gotoCellInput'),
+  gotoCellBtn: byAny('gotoCellBtn'),
+  reloadPreviewBtn: byAny('reloadPreviewBtn'),
+  sortColumn: byAny('sortColumn'),
+  sortDirection: byAny('sortDirection'),
+  sortBtn: byAny('sortBtn'),
+  addRowBtn: byAny('addRowBtn'),
+  deleteTableBtn: byAny('deleteTableBtn'),
+  sortResult: byAny('sortResult'),
+  sortDownloadSlot: byAny('sortDownloadSlot'),
+  statsColumn: byAny('statsColumn'),
+  statsBtn: byAny('statsBtn'),
+  quickQuestion: byAny('quickQuestion'),
+  quickSend: byAny('quickSend'),
+  assistantLog: byAny('dashboardAssistantLog', 'assistantLog'),
+  assistantInput: byAny('dashboardAssistantInput', 'assistantInput'),
+  assistantSend: byAny('dashboardAssistantSend', 'assistantSend'),
+  useOllama: byAny('useOllama'),
+  backToTablesBtn: byAny('backToTablesBtn'),
+  changeTableBtn: byAny('changeTableBtn'),
+  uploadOverlay: byAny('uploadOverlay'),
+  uploadOverlayText: byAny('uploadOverlayText'),
 };
+function on(el, event, handler) { if (el) el.addEventListener(event, handler); }
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -87,6 +93,31 @@ async function fetchJSON(url, options = {}) {
 function setStatus(text) {
   if (els.statusText) els.statusText.textContent = text;
 }
+function showUploadOverlay(filename) {
+  if (!els.uploadOverlay) return;
+  els.uploadOverlay.classList.remove('hidden');
+  if (els.uploadOverlayText) {
+    els.uploadOverlayText.textContent = filename ? `Загрузка: ${filename}` : 'Загрузка таблицы…';
+  }
+}
+function hideUploadOverlay() {
+  if (els.uploadOverlay) els.uploadOverlay.classList.add('hidden');
+}
+
+
+function showUploadOverlay(filename) {
+  if (!els.uploadOverlay) return;
+  els.uploadOverlay.classList.remove('hidden');
+  if (els.uploadOverlayText) {
+    els.uploadOverlayText.textContent = filename ? `Загрузка: ${filename}` : 'Загрузка таблицы…';
+  }
+}
+
+function hideUploadOverlay() {
+  if (!els.uploadOverlay) return;
+  els.uploadOverlay.classList.add('hidden');
+}
+
 
 function addMessage(text, who = 'bot') {
   const message = document.createElement('div');
@@ -94,6 +125,7 @@ function addMessage(text, who = 'bot') {
   message.textContent = text;
   els.assistantLog.appendChild(message);
   els.assistantLog.scrollTop = els.assistantLog.scrollHeight;
+  return message;
 }
 
 function saveActiveTableId() {
@@ -112,29 +144,48 @@ function formatNumber(value) {
   return Number.isFinite(numeric) ? new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(numeric) : String(value);
 }
 
+
+function translateStatsLines(text) {
+  return String(text)
+    .replaceAll('count', 'Количество')
+    .replaceAll('first', 'Первое значение')
+    .replaceAll('int_sum', 'Сумма (целая)')
+    .replaceAll('last', 'Последнее значение')
+    .replaceAll('max', 'Максимум')
+    .replaceAll('mean', 'Среднее')
+    .replaceAll('median', 'Медиана')
+    .replaceAll('min', 'Минимум')
+    .replaceAll('std_sample', 'Стд. отклонение')
+    .replaceAll('sum', 'Сумма')
+    .replaceAll('unique_count', 'Уникальных');
+}
+
 function initialLetters(name = '') {
   return name.replace(/\.[^.]+$/, '').trim().slice(0, 2).toUpperCase() || 'TB';
 }
 
 function renderTablesGrid() {
   const tables = state.tables;
+  if (!els.tablesGrid) return;
   els.tablesGrid.innerHTML = '';
 
-  const uploadCard = document.createElement('div');
-  uploadCard.className = 'table-card upload-card';
-  uploadCard.innerHTML = `
-    <div class="table-preview">
-      <div class="upload-icon">↑</div>
-      <div>Загрузить таблицу</div>
-    </div>
-    <div class="table-meta"><span>CSV / XLSX / TSV / Parquet</span><span class="chev"></span></div>`;
-  uploadCard.addEventListener('click', () => els.uploadInput.click());
-  els.tablesGrid.appendChild(uploadCard);
+  const isGrid = els.tablesGrid.id === 'tablesGrid';
+  if (isGrid) {
+    const uploadCard = document.createElement('div');
+    uploadCard.className = 'table-card upload-card';
+    uploadCard.innerHTML = `
+      <div class="table-preview">
+        <div class="upload-icon">↑</div>
+        <div>Загрузить таблицу</div>
+      </div>
+      <div class="table-meta"><span>CSV / XLSX / TSV / Parquet</span><span class="chev"></span></div>`;
+    uploadCard.addEventListener('click', () => els.uploadInput && els.uploadInput.click());
+    els.tablesGrid.appendChild(uploadCard);
+  }
 
   if (!tables.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.style.gridColumn = '1 / -1';
     empty.textContent = 'Пока нет загруженных таблиц. Добавь файл, и интерфейс построит обзор автоматически.';
     els.tablesGrid.appendChild(empty);
     return;
@@ -142,22 +193,27 @@ function renderTablesGrid() {
 
   tables.forEach((table) => {
     const card = document.createElement('div');
-    card.className = `table-card ${table.table_id === state.activeTableId ? 'active' : ''}`;
-    card.innerHTML = `
-      <div class="table-preview"><div class="file-mark">${escapeHtml(initialLetters(table.name))}</div></div>
-      <div class="table-meta">
-        <div>
-          <span>${escapeHtml(table.name)}</span>
-          <small>${escapeHtml(`${table.rows} строк · ${table.columns} колонок`)}</small>
-        </div>
-        <span class="chev"></span>
-      </div>`;
+    card.className = `${isGrid ? 'table-card' : 'table-item'} ${table.table_id === state.activeTableId ? 'active' : ''}`;
+    if (isGrid) {
+      card.innerHTML = `
+        <div class="table-preview"><div class="file-mark">${escapeHtml(initialLetters(table.name))}</div></div>
+        <div class="table-meta">
+          <div>
+            <span>${escapeHtml(table.name)}</span>
+            <small>${escapeHtml(`${table.rows} строк · ${table.columns} колонок`)}</small>
+          </div>
+          <span class="chev"></span>
+        </div>`;
+    } else {
+      card.innerHTML = `<strong>${escapeHtml(table.name)}</strong><div class="muted">${escapeHtml(`${table.rows} строк · ${table.columns} колонок`)}</div>`;
+    }
     card.addEventListener('click', () => selectTable(table.table_id));
     els.tablesGrid.appendChild(card);
   });
 }
 
 function renderDropdown() {
+  if (!els.tableDropdown) return;
   els.tableDropdown.innerHTML = '';
   state.tables.forEach((table) => {
     const btn = document.createElement('button');
@@ -198,7 +254,8 @@ function renderMiniDashboards() {
 
 function renderKpis() {
   if (!state.activeTable) {
-    els.dashboardKpis.innerHTML = `<div class="empty-state" style="grid-column:1/-1">Здесь появятся KPI после выбора таблицы.</div>`;
+    if (!els.dashboardKpis) return;
+  els.dashboardKpis.innerHTML = `<div class="empty-state" style="grid-column:1/-1">Здесь появятся KPI после выбора таблицы.</div>`;
     return;
   }
   const groups = state.columnGroups;
@@ -206,7 +263,7 @@ function renderKpis() {
     { label: 'Активная таблица', value: state.activeTable.name, compact: true },
     { label: 'Размер файла', value: `${Math.max(1, Math.round((state.activeTable.file_size || 0) / 1024))} KB` },
     { label: 'Дата/время колонки', value: formatNumber(groups.datetime?.length || 0) },
-    { label: 'AI режим', value: state.assistantStatus?.ok ? 'Ollama online' : 'fallback' },
+    { label: 'AI режим', value: state.assistantStatus?.ok ? 'Готово' : 'Готово' },
   ];
   els.dashboardKpis.innerHTML = kpis.map((item) => `
     <div class="kpi-card">
@@ -227,6 +284,7 @@ function renderDonut() {
     stops.push(`${colors[idx]} ${offset}% ${offset + share}%`);
     offset += share;
   });
+  if (!els.donutChart || !els.donutLegend) return;
   els.donutChart.style.background = `conic-gradient(${stops.join(', ')})`;
   els.donutLegend.innerHTML = [
     ['Числовые', values[0]],
@@ -248,7 +306,8 @@ function renderTrend() {
   const rows = state.currentRows.slice(0, 8);
   const numericColumns = numericColumnsFromRows(rows).slice(0, 3);
   if (!rows.length || !numericColumns.length) {
-    els.trendBars.innerHTML = `<div class="empty-state" style="width:100%">Для графика нужна хотя бы одна числовая колонка в preview.</div>`;
+    if (!els.trendBars || !els.trendAxis || !els.bigLineChart || !els.barChartTitle || !els.barChartMeta || !els.bigChartTitle || !els.bigChartMeta) return;
+  els.trendBars.innerHTML = `<div class="empty-state" style="width:100%">Для графика нужна хотя бы одна числовая колонка в preview.</div>`;
     els.trendAxis.innerHTML = '';
     els.bigLineChart.innerHTML = '';
     return;
@@ -309,14 +368,14 @@ function fillSelect(select, values, placeholder = '—') {
 function renderPresetCards() {
   if (!state.dashboardCards.length) {
     els.presetList.innerHTML = `<div class="helper-grid">
-      <div class="helper-card"><strong>Готово к интеграции</strong>Карточки появятся автоматически, когда backend соберёт аналитические блоки по выбранной таблице.</div>
+      <div class="helper-card"><strong>Готово к интеграции</strong>Карточки появятся автоматически после выбора таблицы.</div>
     </div>`;
     return;
   }
   els.presetList.innerHTML = state.dashboardCards.map((card, index) => `
     <div class="preset-card">
       <h4>${escapeHtml(card.title || `Карточка ${index + 1}`)}</h4>
-      <p>${escapeHtml(card.type === 'bar' ? 'Графическая карточка, собранная на backend.' : 'Статистическая карточка, собранная на backend.')}</p>
+      <p>${escapeHtml(card.type === 'bar' ? 'Графическая карточка, собранная автоматически.' : 'Статистическая карточка, собранная автоматически.')}</p>
       <button type="button" data-card-index="${index}">Открыть</button>
     </div>`).join('');
   els.presetList.querySelectorAll('button[data-card-index]').forEach((button) => {
@@ -331,15 +390,16 @@ function activatePresetCard(index) {
     const values = card.payload.values || [];
     const max = Math.max(...values, 1);
     els.barChartTitle.textContent = card.title;
-    els.barChartMeta.textContent = 'backend card';
+    els.barChartMeta.textContent = 'аналитическая карточка';
     els.trendBars.innerHTML = values.map((value) => `<div class="bar-col"><div class="bar-value">${escapeHtml(formatNumber(value))}</div><div class="bar-rect" style="height:${Math.max(8, Math.round((value / max) * 180))}px"></div></div>`).join('');
     els.trendAxis.innerHTML = card.payload.labels.map((label) => `<div>${escapeHtml(label)}</div>`).join('');
   }
   if (card.type === 'stats' && card.payload) {
     const statLines = Object.entries(card.payload).slice(0, 6).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v ?? '—'}`).join('\n');
-    addMessage(`Открыта карточка «${card.title}».\n${statLines}`, 'bot');
+    const msg = addMessage(`Открыта карточка «${card.title}».\n${translateStatsLines(statLines)}`, 'bot'); if (msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } else {
-    addMessage(`Открыта карточка «${card.title}».`, 'bot');
+    const msg = addMessage(`Открыта карточка «${card.title}».`, 'bot');
+    if (msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 
@@ -401,13 +461,21 @@ async function renderPreview() {
   if (!state.activeTableId) return;
   const params = new URLSearchParams({ limit: String(state.previewLimit), offset: String(state.previewOffset) });
   if (state.previewQuery.trim()) params.set('query', state.previewQuery.trim());
+  if (state.currentSort?.column) {
+    params.set('sort_column', state.currentSort.column);
+    params.set('sort_direction', state.currentSort.ascending ? 'asc' : 'desc');
+  }
   const data = await fetchJSON(`/api/table/${state.activeTableId}/preview?${params.toString()}`);
   state.previewTotal = data.total_rows;
   renderTable(data.rows || []);
   const start = data.total_rows ? data.offset + 1 : 0;
   const end = Math.min(data.offset + data.limit, data.total_rows);
   els.pageInfo.textContent = `${start}-${end} из ${data.total_rows}`;
-  els.previewMeta.textContent = state.previewQuery ? `Фильтр: ${state.previewQuery}` : 'редактируемые строки активной таблицы';
+  const sortLabel = state.currentSort?.column ? `Сортировка: ${state.currentSort.column} (${state.currentSort.ascending ? '↑' : '↓'})` : '';
+  if (state.previewQuery && sortLabel) els.previewMeta.textContent = `Фильтр: ${state.previewQuery} · ${sortLabel}`;
+  else if (state.previewQuery) els.previewMeta.textContent = `Фильтр: ${state.previewQuery}`;
+  else if (sortLabel) els.previewMeta.textContent = sortLabel;
+  else els.previewMeta.textContent = 'редактируемые строки активной таблицы';
   els.prevPageBtn.disabled = data.offset <= 0;
   els.nextPageBtn.disabled = data.offset + data.limit >= data.total_rows;
   renderTrend();
@@ -485,10 +553,10 @@ async function refreshAssistantStatus() {
   try {
     const data = await fetchJSON('/api/assistant/status');
     state.assistantStatus = data;
-    els.assistantHealthBadge.textContent = data.ok ? `AI: ${data.model_present ? 'Ollama готова' : 'модель не найдена'}` : 'AI: fallback';
+    if (els.assistantHealthBadge) els.assistantHealthBadge.textContent = data.ok ? `${data.model_present ? 'Готово' : 'Готово'}` : 'fallback';
   } catch (error) {
     state.assistantStatus = { ok: false, error: error.message };
-    els.assistantHealthBadge.textContent = 'AI: fallback';
+    if (els.assistantHealthBadge) els.assistantHealthBadge.textContent = 'fallback';
   }
   renderKpis();
 }
@@ -496,6 +564,7 @@ async function refreshAssistantStatus() {
 async function sendAssistantQuestion(text) {
   if (!text.trim()) return;
   addMessage(text, 'user');
+  const typing = addTypingMessage();
   try {
     const data = await fetchJSON('/api/assistant', {
       method: 'POST',
@@ -503,12 +572,15 @@ async function sendAssistantQuestion(text) {
       body: JSON.stringify({
         table_id: state.activeTableId,
         question: text.trim(),
-        use_ollama: Boolean(els.useOllama.checked),
+        use_ollama: Boolean(els.useOllama?.checked),
       }),
     });
-    addMessage(`${data.answer}${data.source ? `\n\nИсточник: ${data.source}` : ''}`, 'bot');
+    if (typing) typing.remove();
+    const msg = addMessage(`${data.answer}`, 'bot');
+    if (msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (error) {
-    addMessage(`Ошибка assistant: ${error.message}`, 'bot');
+    if (typing) typing.remove();
+    addMessage(`Ошибка ИИ: ${error.message}`, 'bot');
   }
 }
 
@@ -529,7 +601,7 @@ async function loadTables() {
 function renderEmptyMode() {
   state.activeTable = null;
   state.currentRows = [];
-  els.selectedTableName.textContent = 'Выбери таблицу';
+  if (els.selectedTableName) els.selectedTableName.textContent = 'Выбери таблицу';
   renderMiniDashboards();
   renderKpis();
   els.presetList.innerHTML = '<div class="empty-state">Нет активной таблицы.</div>';
@@ -548,7 +620,9 @@ async function refreshActiveTable() {
   state.columnGroups = details.column_groups || { numeric: [], categorical: [], datetime: [] };
   const match = state.tables.find((t) => t.table_id === state.activeTableId);
   if (match) Object.assign(match, details.table);
-  els.selectedTableName.textContent = details.table.name;
+  if (els.selectedTableName) els.selectedTableName.textContent = details.table.name;
+  const titleEl = byAny('activeTableTitle');
+  if (titleEl) titleEl.textContent = details.table.name;
   fillSelect(els.sortColumn, details.table.column_names || [], 'Нет колонок');
   fillSelect(els.statsColumn, details.table.column_names || [], 'Нет колонок');
   renderTablesGrid();
@@ -556,7 +630,7 @@ async function refreshActiveTable() {
   renderMiniDashboards();
   renderKpis();
   renderDonut();
-  setStatus(`Активная таблица: ${details.table.name}. Backend подключён, можно редактировать, сортировать и спрашивать AI.`);
+  setStatus(`Активная таблица: ${details.table.name}. Всё готово к работе.`);
   await Promise.all([renderPreview(), renderDashboardCards()]);
 }
 
@@ -566,7 +640,10 @@ async function selectTable(tableId, resetView = true) {
   if (resetView) {
     state.previewOffset = 0;
     state.previewQuery = '';
-    els.previewSearch.value = '';
+    state.currentSort = null;
+    if (els.previewSearch) els.previewSearch.value = '';
+    if (els.sortResult) els.sortResult.textContent = '';
+    if (els.sortDownloadSlot) els.sortDownloadSlot.innerHTML = '';
   }
   await refreshActiveTable();
 }
@@ -583,37 +660,38 @@ async function uploadFile(file) {
 async function handleUpload() {
   const file = els.uploadInput.files?.[0];
   if (!file) return;
-  setStatus(`Загружаю ${file.name}…`);
+  showUploadOverlay(file.name);
+  setStatus(`Загрузка: ${file.name}`);
   try {
     const data = await uploadFile(file);
     await loadTables();
     if (data.table?.table_id) await selectTable(data.table.table_id);
-    setStatus(`Файл «${file.name}» загружен. Таблица нормализована и готова к работе.`);
+    setStatus(`Файл «${file.name}» загружен.`);
   } catch (error) {
     setStatus(`Ошибка загрузки: ${error.message}`);
   } finally {
+    hideUploadOverlay();
     els.uploadInput.value = '';
   }
 }
 
 async function handleSort() {
-  if (!state.activeTableId || !els.sortColumn.value) return;
-  els.sortResult.textContent = 'Сортирую…';
+  if (!state.activeTableId || !els.sortColumn || !els.sortColumn.value) return;
+  if (els.sortResult) els.sortResult.textContent = 'Сортирую…';
   try {
+    const ascending = els.sortDirection.value === 'asc';
     const data = await fetchJSON(`/api/table/${state.activeTableId}/sort`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ column: els.sortColumn.value, ascending: els.sortDirection.value === 'asc' }),
+      body: JSON.stringify({ column: els.sortColumn.value, ascending }),
     });
-    els.sortResult.textContent = data.message || 'Сортировка готова.';
-    els.sortDownloadSlot.innerHTML = data.download_url ? `<a class="download-link" href="${data.download_url}">Скачать отсортированный файл</a>` : '';
-    if (data.preview) {
-      renderTable(data.preview);
-      els.previewMeta.textContent = `Показан preview результата сортировки по ${els.sortColumn.value}`;
-      renderTrend();
-    }
+    state.currentSort = { column: els.sortColumn.value, ascending };
+    state.previewOffset = 0;
+    if (els.sortResult) els.sortResult.textContent = `${data.message || 'Сортировка готова.'} Источник: ${data.source || 'неизвестно'}.`;
+    if (els.sortDownloadSlot) els.sortDownloadSlot.innerHTML = '';
+    await renderPreview();
   } catch (error) {
-    els.sortResult.textContent = `Ошибка сортировки: ${error.message}`;
+    if (els.sortResult) els.sortResult.textContent = `Ошибка сортировки: ${error.message}`;
   }
 }
 
@@ -644,82 +722,82 @@ function handleGoToCell() {
     setStatus('Такой колонки нет в текущей таблице.');
     return;
   }
-  const rowId = rowNumber - 2;
+  const rowId = rowNumber - 1;
   state.highlightedCell = { rowId, column };
   const page = Math.max(0, Math.floor(rowId / state.previewLimit));
   state.previewOffset = page * state.previewLimit;
   renderPreview().catch((error) => setStatus(`Не удалось перейти к ячейке: ${error.message}`));
 }
 
+
 function bindEvents() {
   document.querySelectorAll('.tab-btn').forEach((button) => button.addEventListener('click', () => openTab(button.dataset.tab)));
-  els.selectedTableBox.addEventListener('click', () => els.tableDropdown.classList.toggle('hidden'));
+  on(els.selectedTableBox, 'click', () => els.tableDropdown && els.tableDropdown.classList.toggle('hidden'));
   document.addEventListener('click', (event) => {
-    if (!els.tableDropdown.contains(event.target) && !els.selectedTableBox.contains(event.target)) {
+    if (els.tableDropdown && els.selectedTableBox && !els.tableDropdown.contains(event.target) && !els.selectedTableBox.contains(event.target)) {
       els.tableDropdown.classList.add('hidden');
     }
   });
-  els.uploadInput.addEventListener('change', handleUpload);
-  els.refreshTablesBtn.addEventListener('click', () => loadTables().catch((error) => setStatus(error.message)));
-  els.openDashboardBtn.addEventListener('click', () => openTab('dashboards'));
-  els.backToTablesBtn.addEventListener('click', () => openTab('tables'));
-  els.changeTableBtn.addEventListener('click', () => { openTab('tables'); els.tableDropdown.classList.remove('hidden'); });
-  els.previewSearch.addEventListener('keydown', (event) => {
+  on(els.uploadInput, 'change', handleUpload);
+  on(els.refreshTablesBtn, 'click', () => loadTables().catch((error) => setStatus(error.message)));
+  on(els.openDashboardBtn, 'click', () => openTab('dashboards'));
+  on(els.backToTablesBtn, 'click', () => openTab('tables'));
+  on(els.changeTableBtn, 'click', () => { openTab('tables'); if (els.tableDropdown) els.tableDropdown.classList.remove('hidden'); });
+  on(els.previewSearch, 'keydown', (event) => {
     if (event.key === 'Enter') {
       state.previewQuery = els.previewSearch.value.trim();
       state.previewOffset = 0;
       renderPreview().catch((error) => setStatus(error.message));
     }
   });
-  els.previewPageSize.addEventListener('change', () => {
+  on(els.previewPageSize, 'change', () => {
     state.previewLimit = Number(els.previewPageSize.value) || 50;
     state.previewOffset = 0;
     renderPreview().catch((error) => setStatus(error.message));
   });
-  els.gotoPageBtn.addEventListener('click', () => {
-    const page = Math.max(1, Number(els.gotoPageInput.value) || 1);
+  on(els.gotoPageBtn, 'click', () => {
+    const page = Math.max(1, Number(els.gotoPageInput?.value) || 1);
     state.previewOffset = (page - 1) * state.previewLimit;
     renderPreview().catch((error) => setStatus(error.message));
   });
-  els.gotoCellBtn.addEventListener('click', handleGoToCell);
-  els.reloadPreviewBtn.addEventListener('click', () => refreshActiveTable().catch((error) => setStatus(error.message)));
-  els.prevPageBtn.addEventListener('click', () => {
+  on(els.gotoCellBtn, 'click', handleGoToCell);
+  on(els.reloadPreviewBtn, 'click', () => refreshActiveTable().catch((error) => setStatus(error.message)));
+  on(els.prevPageBtn, 'click', () => {
     state.previewOffset = Math.max(0, state.previewOffset - state.previewLimit);
     renderPreview().catch((error) => setStatus(error.message));
   });
-  els.nextPageBtn.addEventListener('click', () => {
+  on(els.nextPageBtn, 'click', () => {
     state.previewOffset += state.previewLimit;
     renderPreview().catch((error) => setStatus(error.message));
   });
-  els.sortBtn.addEventListener('click', handleSort);
-  els.addRowBtn.addEventListener('click', handleAddRow);
-  els.statsBtn.addEventListener('click', () => renderStats().catch((error) => addMessage(`Ошибка статистики: ${error.message}`, 'bot')));
-  els.quickSend.addEventListener('click', () => {
-    const text = els.quickQuestion.value.trim();
+  on(els.sortBtn, 'click', handleSort);
+  on(els.addRowBtn, 'click', handleAddRow);
+  on(els.statsBtn, 'click', () => renderStats().catch((error) => addMessage(`Ошибка статистики: ${error.message}`, 'bot')));
+  on(els.quickSend, 'click', () => {
+    const text = els.quickQuestion?.value?.trim();
     if (!text) return;
     openTab('dashboards');
     sendAssistantQuestion(text);
     els.quickQuestion.value = '';
   });
-  els.quickQuestion.addEventListener('keydown', (event) => { if (event.key === 'Enter') els.quickSend.click(); });
-  els.assistantSend.addEventListener('click', () => {
-    const text = els.assistantInput.value.trim();
+  on(els.quickQuestion, 'keydown', (event) => { if (event.key === 'Enter' && els.quickSend) els.quickSend.click(); });
+  on(els.assistantSend, 'click', () => {
+    const text = els.assistantInput?.value?.trim();
     if (!text) return;
     sendAssistantQuestion(text);
     els.assistantInput.value = '';
   });
-  els.assistantInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') els.assistantSend.click(); });
+  on(els.assistantInput, 'keydown', (event) => { if (event.key === 'Enter' && els.assistantSend) els.assistantSend.click(); });
   document.querySelectorAll('.hint-card').forEach((card) => card.addEventListener('click', () => {
-    els.assistantInput.value = card.dataset.prompt || card.textContent;
-    els.assistantSend.click();
+    if (els.assistantInput) els.assistantInput.value = card.dataset.prompt || card.textContent;
+    if (els.assistantSend) els.assistantSend.click();
   }));
 }
-
 async function init() {
   bindEvents();
-  const initialTab = document.body.dataset.initialTab || 'tables';
+  const initialTab = document.body.dataset.initialTab || (document.body.dataset.page === 'dashboards' ? 'dashboards' : 'tables');
   openTab(initialTab);
-  state.previewLimit = Number(els.previewPageSize.value) || 50;
+  state.previewLimit = Number(els.previewPageSize?.value || 50) || 50;
   await Promise.allSettled([refreshAssistantStatus(), loadTables()]);
 }
 

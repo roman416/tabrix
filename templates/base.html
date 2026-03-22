@@ -8,21 +8,27 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body data-page="{{ page_name }}">
+  <div id="uploadOverlay" class="upload-overlay hidden">
+    <div class="upload-modal">
+      <div class="spinner"></div>
+      <div id="uploadOverlayText" class="upload-overlay-text">Загрузка таблицы…</div>
+    </div>
+  </div>
+
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="brand glass">
-        <div class="brand-mark">▦</div>
-        <div>
-          <h1>Табрикс</h1>
-          <p>Веб-интерфейс для больших таблиц без фирменной тоски офисных комбайнов.</p>
+      <a href="{{ url_for('index') }}" class="brand glass brand-link">
+        <div class="brand-images">
+          <img src="{{ url_for('static', filename='Vector 29.png') }}" alt="Табрикс" class="brand-icon" />
+          <img src="{{ url_for('static', filename='Табрикс.png') }}" alt="Табрикс" class="brand-wordmark" />
         </div>
-      </div>
+      </a>
 
       <div class="upload-card glass">
         <label for="fileInput" class="label">Загрузить таблицу</label>
         <input id="fileInput" type="file" accept=".csv,.tsv,.xlsx,.xls,.xlsm,.parquet" />
         <button id="uploadBtn">Импортировать</button>
-        <div id="uploadStatus" class="muted">Поддержка CSV, XLSX, XLS, TSV и Parquet.</div>
+        <div id="uploadStatus" class="muted">Выбери файл и нажми «Импортировать».</div>
       </div>
 
       <div class="nav-card glass">
@@ -30,9 +36,9 @@
           <h3>Разделы</h3>
         </div>
         <nav class="page-nav">
-          <a href="{{ url_for('index') }}" class="page-link {% if page_name == 'overview' %}active{% endif %}">Обзор</a>
-          <a href="{{ url_for('dashboards_page') }}" class="page-link {% if page_name == 'dashboards' %}active{% endif %}">Дашборды</a>
-          <a href="{{ url_for('assistant_page') }}" class="page-link {% if page_name == 'assistant' %}active{% endif %}">Помощник</a>
+          <a href="{{ url_for('index') }}" class="page-link {% if page_name == 'overview' %}active{% endif %}">Таблицы</a>
+          <a href="{{ url_for('dashboards_page') }}" class="page-link {% if page_name == 'dashboards' %}active{% endif %}">Дашборд</a>
+          <a href="{{ url_for('assistant_page') }}" class="page-link {% if page_name == 'assistant' %}active{% endif %}">ИИ</a>
         </nav>
       </div>
 
